@@ -1,4 +1,4 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 const KEYAUTH_API_URL = "https://keyauth.win/api/1.3/";
 
@@ -37,11 +37,31 @@ async function callKeyAuth(params: Record<string, string>) {
   return response.json() as Promise<KeyAuthInitResponse | KeyAuthLoginResponse>;
 }
 
+function getKeyAuthHwid(name: string, ownerid: string) {
+  const explicitHwid = process.env.KEYAUTH_HWID?.trim();
+
+  if (explicitHwid) {
+    return explicitHwid;
+  }
+
+  const seed = [
+    process.env.ADMIN_SESSION_SECRET,
+    ownerid,
+    name,
+    "panel-rexx-admin"
+  ]
+    .filter(Boolean)
+    .join(":");
+  const digest = createHash("sha256").update(seed).digest("hex").slice(0, 32);
+
+  return `panel-rexx-web-${digest}`;
+}
+
 export async function verifyKeyAuthUser(username: string, password: string) {
   const name = requiredEnv("KEYAUTH_NAME");
   const ownerid = requiredEnv("KEYAUTH_OWNER_ID");
   const version = process.env.KEYAUTH_VERSION ?? "1.0";
-  const hwid = process.env.KEYAUTH_HWID;
+  const hwid = getKeyAuthHwid(name, ownerid);
 
   const init = (await callKeyAuth({
     type: "init",
@@ -63,12 +83,9 @@ export async function verifyKeyAuthUser(username: string, password: string) {
     pass: password,
     name,
     ownerid,
-    sessionid: init.sessionid
+    sessionid: init.sessionid,
+    hwid
   };
-
-  if (hwid) {
-    loginPayload.hwid = hwid;
-  }
 
   const login = (await callKeyAuth(loginPayload)) as KeyAuthLoginResponse;
 

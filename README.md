@@ -23,6 +23,7 @@ KEYAUTH_NAME=
 KEYAUTH_OWNER_ID=
 KEYAUTH_SECRET=
 KEYAUTH_VERSION=1.0
+# Optional. Leave blank to let the app generate a stable web-admin HWID.
 KEYAUTH_HWID=
 ADMIN_SESSION_SECRET=replace-with-a-long-random-secret
 ```
@@ -30,7 +31,7 @@ ADMIN_SESSION_SECRET=replace-with-a-long-random-secret
 Do not commit real KeyAuth credentials. On Netlify, add the same variables in Site configuration -> Environment variables.
 
 The admin page uses KeyAuth username/password login at `/admin`.
-If your KeyAuth app has Force HWID enabled, set `KEYAUTH_HWID` or disable Force HWID in the KeyAuth app settings.
+If your KeyAuth app has Force HWID enabled, the API now sends a stable generated web-admin HWID when `KEYAUTH_HWID` is blank. Set `KEYAUTH_HWID` only if you want to force a specific value.
 
 ## Storage
 
