@@ -31,10 +31,8 @@ export default function AdminPage() {
   const isAuthenticated = Boolean(token);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("panel-rexx-admin-token");
-    if (stored) {
-      setToken(stored);
-    }
+    window.localStorage.removeItem("panel-rexx-admin-token");
+    window.sessionStorage.removeItem("panel-rexx-admin-token");
   }, []);
 
   useEffect(() => {
@@ -74,7 +72,6 @@ export default function AdminPage() {
       return;
     }
 
-    window.localStorage.setItem("panel-rexx-admin-token", payload.token);
     setToken(payload.token);
     setMessage("Admin session online.");
   };
