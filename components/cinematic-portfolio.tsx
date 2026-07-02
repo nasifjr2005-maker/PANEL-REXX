@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentType, FormEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import gsap from "gsap";
 import Lenis from "lenis";
@@ -128,10 +128,35 @@ export function CinematicPortfolio({ Scene, initialContent = defaultContent }: {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 24, mass: 0.2 });
 
+  const refreshContent = useCallback(() => {
+    fetch(`/api/content?t=${Date.now()}`, {
+      cache: "no-store",
+      headers: {
+        "cache-control": "no-store"
+      }
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (payload?.content) {
+          setContent(payload.content);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    setContent(initialContent);
+  }, [initialContent]);
+
   useEffect(() => {
     let cancelled = false;
 
-    fetch("/api/content", { cache: "no-store" })
+    fetch(`/api/content?t=${Date.now()}`, {
+      cache: "no-store",
+      headers: {
+        "cache-control": "no-store"
+      }
+    })
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (!cancelled && payload?.content) {
@@ -144,6 +169,23 @@ export function CinematicPortfolio({ Scene, initialContent = defaultContent }: {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const onFocus = () => refreshContent();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshContent();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [refreshContent]);
 
   useEffect(() => {
     if (reduceMotion) {
