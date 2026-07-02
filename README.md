@@ -42,6 +42,8 @@ Admin edits are saved through `/api/content`.
 - On Netlify: saved in Netlify Blobs, so changes survive function/server restarts.
 - Locally: saved to `.data/site-content.json`.
 - The admin panel shows the active storage backend after saving. If storage fails, the API returns a JSON error instead of silently resetting to defaults.
+- Netlify serverless paths such as `/var/task` are read-only, so deployed functions always use Netlify Blobs instead of the local JSON fallback.
+- If your Netlify runtime ever does not inject the Blobs context automatically, add `NETLIFY_SITE_ID` and `NETLIFY_BLOBS_TOKEN` as environment variables. `NETLIFY_AUTH_TOKEN` or `NETLIFY_API_TOKEN` also work as token fallbacks.
 
 ## Netlify
 

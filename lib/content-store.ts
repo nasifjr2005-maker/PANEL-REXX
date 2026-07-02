@@ -8,6 +8,7 @@ import type { Project, SiteContent } from "@/types/content";
 const STORE_NAME = "portfolio-admin";
 const CONTENT_KEY = "site-content";
 const LOCAL_DATA_PATH = path.join(process.cwd(), ".data", "site-content.json");
+const NETLIFY_BLOBS_TOKEN_ENV = ["NETLIFY_BLOBS_TOKEN", "NETLIFY_AUTH_TOKEN", "NETLIFY_API_TOKEN"] as const;
 
 export type ContentStorageDetails = {
   provider: "netlify-blobs" | "local-file";
@@ -60,12 +61,64 @@ function mergeContent(content: Partial<SiteContent> | null | undefined): SiteCon
   };
 }
 
-function canUseNetlifyBlobs() {
-  return Boolean(process.env.NETLIFY || (process.env.NETLIFY_BLOBS_CONTEXT && process.env.NETLIFY_SITE_ID));
+function cleanEnvValue(value: string | undefined) {
+  return value?.trim() ?? "";
+}
+
+function getGlobalNetlifyBlobsContext() {
+  return (globalThis as typeof globalThis & { netlifyBlobsContext?: unknown }).netlifyBlobsContext;
+}
+
+function hasManualNetlifyBlobsConfig() {
+  const siteID = cleanEnvValue(process.env.NETLIFY_SITE_ID) || cleanEnvValue(process.env.SITE_ID);
+  const token = NETLIFY_BLOBS_TOKEN_ENV.some((name) => cleanEnvValue(process.env[name]));
+
+  return Boolean(siteID && token);
+}
+
+function isNetlifyServerlessRuntime() {
+  return Boolean(
+    process.env.NETLIFY ||
+      process.env.NETLIFY_BLOBS_CONTEXT ||
+      getGlobalNetlifyBlobsContext() ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.LAMBDA_TASK_ROOT ||
+      process.cwd().startsWith("/var/task")
+  );
+}
+
+function shouldUseNetlifyBlobs() {
+  return isNetlifyServerlessRuntime() || hasManualNetlifyBlobsConfig();
+}
+
+function getNetlifyBlobsToken() {
+  for (const name of NETLIFY_BLOBS_TOKEN_ENV) {
+    const token = cleanEnvValue(process.env[name]);
+    if (token) {
+      return token;
+    }
+  }
+
+  return "";
+}
+
+function getNetlifyStore() {
+  const siteID = cleanEnvValue(process.env.NETLIFY_SITE_ID) || cleanEnvValue(process.env.SITE_ID);
+  const token = getNetlifyBlobsToken();
+
+  if (siteID && token) {
+    return getStore({
+      name: STORE_NAME,
+      siteID,
+      token
+    });
+  }
+
+  return getStore(STORE_NAME);
 }
 
 function getStorageDetails(): ContentStorageDetails {
-  if (canUseNetlifyBlobs()) {
+  if (shouldUseNetlifyBlobs()) {
     return {
       provider: "netlify-blobs",
       label: "Netlify Blobs",
@@ -83,7 +136,7 @@ function getStorageDetails(): ContentStorageDetails {
 
 async function readStoredContent(storage: ContentStorageDetails) {
   if (storage.provider === "netlify-blobs") {
-    const store = getStore(STORE_NAME);
+    const store = getNetlifyStore();
     return (await store.get(CONTENT_KEY, { type: "json" })) as Partial<SiteContent> | null;
   }
 
@@ -127,7 +180,7 @@ export async function saveSiteContentWithStorage(content: SiteContent) {
 
   try {
     if (storage.provider === "netlify-blobs") {
-      const store = getStore(STORE_NAME);
+      const store = getNetlifyStore();
       await store.setJSON(CONTENT_KEY, nextContent);
       return { content: nextContent, storage };
     }
