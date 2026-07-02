@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resetSiteContent } from "@/lib/content-store";
+import { ContentStorageError, resetSiteContentWithStorage } from "@/lib/content-store";
 import { isAdminTokenValid } from "@/lib/keyauth";
 
 export const runtime = "nodejs";
@@ -12,6 +12,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
   }
 
-  const content = await resetSiteContent();
-  return NextResponse.json({ content });
+  try {
+    const result = await resetSiteContentWithStorage();
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof ContentStorageError) {
+      return NextResponse.json({ message: error.message, storage: error.storage }, { status: 500 });
+    }
+
+    return NextResponse.json({ message: "Content reset failed." }, { status: 500 });
+  }
 }

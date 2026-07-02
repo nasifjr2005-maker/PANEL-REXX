@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSiteContent, saveSiteContent } from "@/lib/content-store";
+import { ContentStorageError, getSiteContentWithStorage, saveSiteContentWithStorage } from "@/lib/content-store";
 import { isAdminTokenValid } from "@/lib/keyauth";
 import type { SiteContent } from "@/types/content";
 
@@ -7,8 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const content = await getSiteContent();
-  return NextResponse.json({ content });
+  const result = await getSiteContentWithStorage();
+  return NextResponse.json(result);
 }
 
 export async function PUT(request: Request) {
@@ -24,6 +24,14 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: "Missing content payload." }, { status: 400 });
   }
 
-  const content = await saveSiteContent(body.content);
-  return NextResponse.json({ content });
+  try {
+    const result = await saveSiteContentWithStorage(body.content);
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof ContentStorageError) {
+      return NextResponse.json({ message: error.message, storage: error.storage }, { status: 500 });
+    }
+
+    return NextResponse.json({ message: "Content storage failed." }, { status: 500 });
+  }
 }

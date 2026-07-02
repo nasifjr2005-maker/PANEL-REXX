@@ -9,6 +9,24 @@ const STORE_NAME = "portfolio-admin";
 const CONTENT_KEY = "site-content";
 const LOCAL_DATA_PATH = path.join(process.cwd(), ".data", "site-content.json");
 
+export type ContentStorageDetails = {
+  provider: "netlify-blobs" | "local-file";
+  label: string;
+  persistent: boolean;
+  path?: string;
+};
+
+export class ContentStorageError extends Error {
+  storage: ContentStorageDetails;
+
+  constructor(action: "read" | "write", storage: ContentStorageDetails, error: unknown) {
+    const details = error instanceof Error ? error.message : "Unknown storage error";
+    super(`Content storage ${action} failed on ${storage.label}: ${details}`);
+    this.name = "ContentStorageError";
+    this.storage = storage;
+  }
+}
+
 function mergeProjects(projects: Project[] | undefined): Project[] {
   if (!projects) {
     return defaultContent.projects;
@@ -46,43 +64,92 @@ function canUseNetlifyBlobs() {
   return Boolean(process.env.NETLIFY || (process.env.NETLIFY_BLOBS_CONTEXT && process.env.NETLIFY_SITE_ID));
 }
 
-export async function getSiteContent(): Promise<SiteContent> {
+function getStorageDetails(): ContentStorageDetails {
   if (canUseNetlifyBlobs()) {
-    try {
-      const store = getStore(STORE_NAME);
-      const stored = (await store.get(CONTENT_KEY, { type: "json" })) as Partial<SiteContent> | null;
-      return mergeContent(stored);
-    } catch {
-      return defaultContent;
-    }
+    return {
+      provider: "netlify-blobs",
+      label: "Netlify Blobs",
+      persistent: true
+    };
+  }
+
+  return {
+    provider: "local-file",
+    label: "Local JSON file",
+    persistent: true,
+    path: LOCAL_DATA_PATH
+  };
+}
+
+async function readStoredContent(storage: ContentStorageDetails) {
+  if (storage.provider === "netlify-blobs") {
+    const store = getStore(STORE_NAME);
+    return (await store.get(CONTENT_KEY, { type: "json" })) as Partial<SiteContent> | null;
   }
 
   if (!existsSync(LOCAL_DATA_PATH)) {
-    return defaultContent;
+    return null;
   }
 
+  const raw = await readFile(LOCAL_DATA_PATH, "utf8");
+  return JSON.parse(raw) as Partial<SiteContent>;
+}
+
+export async function getSiteContentWithStorage() {
+  const storage = getStorageDetails();
+
   try {
-    const raw = await readFile(LOCAL_DATA_PATH, "utf8");
-    return mergeContent(JSON.parse(raw) as Partial<SiteContent>);
-  } catch {
-    return defaultContent;
+    const stored = await readStoredContent(storage);
+    return {
+      content: mergeContent(stored),
+      storage,
+      warning: null as string | null
+    };
+  } catch (error) {
+    const storageError = new ContentStorageError("read", storage, error);
+
+    return {
+      content: defaultContent,
+      storage,
+      warning: storageError.message
+    };
+  }
+}
+
+export async function getSiteContent(): Promise<SiteContent> {
+  const result = await getSiteContentWithStorage();
+  return result.content;
+}
+
+export async function saveSiteContentWithStorage(content: SiteContent) {
+  const nextContent = mergeContent(content);
+  const storage = getStorageDetails();
+
+  try {
+    if (storage.provider === "netlify-blobs") {
+      const store = getStore(STORE_NAME);
+      await store.setJSON(CONTENT_KEY, nextContent);
+      return { content: nextContent, storage };
+    }
+
+    await mkdir(path.dirname(LOCAL_DATA_PATH), { recursive: true });
+    await writeFile(LOCAL_DATA_PATH, JSON.stringify(nextContent, null, 2), "utf8");
+    return { content: nextContent, storage };
+  } catch (error) {
+    throw new ContentStorageError("write", storage, error);
   }
 }
 
 export async function saveSiteContent(content: SiteContent) {
-  const nextContent = mergeContent(content);
+  const result = await saveSiteContentWithStorage(content);
+  return result.content;
+}
 
-  if (canUseNetlifyBlobs()) {
-    const store = getStore(STORE_NAME);
-    await store.setJSON(CONTENT_KEY, nextContent);
-    return nextContent;
-  }
-
-  await mkdir(path.dirname(LOCAL_DATA_PATH), { recursive: true });
-  await writeFile(LOCAL_DATA_PATH, JSON.stringify(nextContent, null, 2), "utf8");
-  return nextContent;
+export async function resetSiteContentWithStorage() {
+  return saveSiteContentWithStorage(defaultContent);
 }
 
 export async function resetSiteContent() {
-  return saveSiteContent(defaultContent);
+  const result = await resetSiteContentWithStorage();
+  return result.content;
 }

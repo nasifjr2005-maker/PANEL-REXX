@@ -7,6 +7,17 @@ import { defaultContent } from "@/lib/default-content";
 import type { SiteContent, SocialLink } from "@/types/content";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+type StoragePayload = {
+  storage?: {
+    label?: string;
+  };
+  warning?: string | null;
+  message?: string;
+};
+
+function storageLabel(payload: StoragePayload) {
+  return payload.storage?.label ?? "persistent storage";
+}
 
 export default function AdminPage() {
   const [token, setToken] = useState("");
@@ -33,6 +44,10 @@ export default function AdminPage() {
         if (payload?.content) {
           setContent(payload.content);
           setJsonDraft(JSON.stringify(payload.content, null, 2));
+        }
+
+        if (payload?.warning) {
+          setMessage(payload.warning);
         }
       })
       .catch(() => {
@@ -144,7 +159,7 @@ export default function AdminPage() {
       },
       body: JSON.stringify({ content })
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({ message: "Save failed." }));
 
     if (!response.ok) {
       setSaveState("error");
@@ -155,7 +170,7 @@ export default function AdminPage() {
     setContent(payload.content);
     setJsonDraft(JSON.stringify(payload.content, null, 2));
     setSaveState("saved");
-    setMessage("Saved. Public site will update from storage.");
+    setMessage(`Saved permanently to ${storageLabel(payload)}. Server restarts will keep these changes.`);
     window.setTimeout(() => setSaveState("idle"), 2200);
   };
 
@@ -167,7 +182,7 @@ export default function AdminPage() {
         "x-admin-token": token
       }
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({ message: "Reset failed." }));
 
     if (!response.ok) {
       setSaveState("error");
@@ -178,7 +193,7 @@ export default function AdminPage() {
     setContent(payload.content);
     setJsonDraft(JSON.stringify(payload.content, null, 2));
     setSaveState("saved");
-    setMessage("Content reset to defaults.");
+    setMessage(`Defaults saved to ${storageLabel(payload)}.`);
   };
 
   return (

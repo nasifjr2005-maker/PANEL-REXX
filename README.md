@@ -41,6 +41,7 @@ Admin edits are saved through `/api/content`.
 
 - On Netlify: saved in Netlify Blobs, so changes survive function/server restarts.
 - Locally: saved to `.data/site-content.json`.
+- The admin panel shows the active storage backend after saving. If storage fails, the API returns a JSON error instead of silently resetting to defaults.
 
 ## Netlify
 
