@@ -181,9 +181,15 @@ export function CinematicPortfolio({ Scene, initialContent = defaultContent }: {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
+    // Periodic polling every 5 seconds to catch admin updates
+    const pollInterval = setInterval(() => {
+      refreshContent();
+    }, 5000);
+
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      clearInterval(pollInterval);
     };
   }, [refreshContent]);
 
@@ -397,7 +403,7 @@ function Navigation({
     <header className="nav-shell">
       <button className="brand-mark" type="button" onClick={() => scrollTo("home")} aria-label="Go to hero section">
         <span className="brand-icon avatar-brand-icon" style={{ backgroundImage: `url(${content.identity.avatarUrl})` }} aria-hidden="true" />
-        <span>Panel Rexx</span>
+        <span>{content.identity.onlineName || content.identity.name}</span>
       </button>
       <nav className="nav-links" aria-label="Primary navigation">
         {navItems.map((item) => (
@@ -452,6 +458,7 @@ function Hero({ content, scrollTo }: { content: SiteContent; scrollTo: (id: stri
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 0.22], [0, -52]);
   const opacity = useTransform(scrollYProgress, [0, 0.18], [1, 0.68]);
+  const heroTitle = `Hi, I'm ${content.identity.name}`;
 
   return (
     <section id="home" className="hero-shell">
@@ -468,8 +475,8 @@ function Hero({ content, scrollTo }: { content: SiteContent; scrollTo: (id: stri
           </motion.div>
           <motion.h1
             className="hero-title glitch"
-            data-text="Hi, I'm Nasif"
-            aria-label="Hi, I'm Nasif"
+            data-text={heroTitle}
+            aria-label={heroTitle}
             initial={{ opacity: 0, y: 40, filter: "blur(12px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             transition={{ duration: 0.9, delay: 2.28 }}
@@ -477,7 +484,7 @@ function Hero({ content, scrollTo }: { content: SiteContent; scrollTo: (id: stri
             <span aria-hidden="true">
               Hi,
               <br />
-              I&apos;m <span className="text-gradient">Nasif</span>
+              I&apos;m <span className="text-gradient">{content.identity.name}</span>
             </span>
           </motion.h1>
           <motion.p
@@ -486,7 +493,7 @@ function Hero({ content, scrollTo }: { content: SiteContent; scrollTo: (id: stri
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.72, delay: 2.5 }}
           >
-            Also known as <strong>{content.identity.onlineName}</strong>, a {content.identity.department} diploma student from{" "}
+            Also known as <strong>{content.identity.onlineName}</strong>, a {content.identity.department} {content.identity.education.toLowerCase()} from{" "}
             {content.identity.city}, {content.identity.country}, founder of {content.identity.guild} and {content.identity.founder}.
           </motion.p>
           <motion.div
@@ -546,10 +553,12 @@ function Hero({ content, scrollTo }: { content: SiteContent; scrollTo: (id: stri
 }
 
 function About({ content }: { content: SiteContent }) {
+  const profileFacts = getDisplayProfileFacts(content);
+
   return (
     <RevealSection id="about" kicker="About Signal" title="Holographic Profile Cards" copy={content.aboutCopy}>
       <dl className="profile-grid">
-        {content.profileFacts.map((fact, index) => (
+        {profileFacts.map((fact, index) => (
           <TiltCard className="profile-card glass-panel magnetic" key={fact.label} delay={index * 0.035}>
             <dt>{fact.label}</dt>
             <dd>{fact.value}</dd>
@@ -566,7 +575,7 @@ function DigitalScanner({ content }: { content: SiteContent }) {
       id="scanner"
       kicker="AI Profile Scanner"
       title="Identity, Skills, Education, Experience"
-      copy="A cinematic scan of the signals shaping Nasif's digital universe."
+      copy={`A cinematic scan of the signals shaping ${content.identity.name}'s digital universe.`}
     >
       <div className="scanner-layout">
         <motion.div className="scanner-core glass-panel animated-border" initial={{ opacity: 0, x: -40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: 0.35 }}>
@@ -614,7 +623,7 @@ function Skills({ content }: { content: SiteContent }) {
       id="skills"
       kicker="Skill Matrix"
       title="Floating Holographic Cards"
-      copy="Each card reacts like a piece of a live operating system, highlighting the tools and thinking Nasif is building with."
+      copy={`Each card reacts like a piece of a live operating system, highlighting the tools and thinking ${content.identity.name} is building with.`}
     >
       <div className="skills-grid">
         {content.skills.map((skill, index) => {
@@ -642,8 +651,8 @@ function Founder({ content }: { content: SiteContent }) {
     <RevealSection
       id="founder"
       kicker="Founder Command"
-      title="Founder of PANEL 50 OFFICIAL STORE"
-      copy="A premium command dashboard for the business and gaming-inspired identity Nasif is shaping."
+      title={`Founder of ${content.identity.founder}`}
+      copy={`A premium command dashboard for the business and gaming-inspired identity ${content.identity.name} is shaping.`}
     >
       <div className="founder-grid">
         <div className="dashboard-panel glass-panel animated-border">
@@ -670,8 +679,8 @@ function Founder({ content }: { content: SiteContent }) {
         </div>
         <div className="circuit-board glass-panel">
           <div className="circuit-lines">
-            <a className="circuit-chip main panel50-logo-chip" href={storeUrl} target="_blank" rel="noreferrer" aria-label="Open PANEL 50 Official Store">
-              <img src="/assets/panel50-logo.png" alt="PANEL 50" />
+            <a className="circuit-chip main panel50-logo-chip" href={storeUrl} target="_blank" rel="noreferrer" aria-label={`Open ${content.identity.founder}`}>
+              <img src="/assets/panel50-logo.png" alt={content.identity.founder} />
             </a>
             <a className="circuit-chip mini-a" href={storeUrl} target="_blank" rel="noreferrer">
               Store
@@ -1087,6 +1096,41 @@ function getInitials(name: string, onlineName: string) {
     .join("");
 
   return initials || "PR";
+}
+
+function getDisplayProfileFacts(content: SiteContent) {
+  const founderValue = [content.identity.guild, content.identity.founder].filter(Boolean).join(" + ");
+  const identityFacts = new Map(
+    [
+      ["name", content.identity.name],
+      ["online name", content.identity.onlineName],
+      ["country", content.identity.country],
+      ["city", content.identity.city],
+      ["education", content.identity.education],
+      ["institution", content.identity.institution],
+      ["department", content.identity.department],
+      ["founder", founderValue],
+      ["email", content.identity.email],
+      ["whatsapp", content.identity.whatsapp]
+    ].map(([label, value]) => [label, value || ""])
+  );
+
+  const syncedFacts = content.profileFacts.map((fact) => ({
+    ...fact,
+    value: identityFacts.get(fact.label.toLowerCase()) || fact.value
+  }));
+
+  for (const [label, value] of identityFacts) {
+    const exists = syncedFacts.some((fact) => fact.label.toLowerCase() === label);
+    if (!exists && value) {
+      syncedFacts.push({
+        label: label.replace(/\b\w/g, (character) => character.toUpperCase()),
+        value
+      });
+    }
+  }
+
+  return syncedFacts;
 }
 
 function getSocialUrl(content: SiteContent, name: string) {

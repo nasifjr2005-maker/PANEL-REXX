@@ -151,13 +151,26 @@ export default function AdminPage() {
     setSaveState("saving");
     setMessage("Saving content...");
 
+    let contentToSave = content;
+
+    if (jsonDraft.trim()) {
+      try {
+        contentToSave = JSON.parse(jsonDraft) as SiteContent;
+        setContent(contentToSave);
+      } catch {
+        setSaveState("error");
+        setMessage("Full Site JSON is invalid. Fix it or click Apply JSON before saving.");
+        return;
+      }
+    }
+
     const response = await fetch("/api/content", {
       method: "PUT",
       headers: {
         "content-type": "application/json",
         "x-admin-token": token
       },
-      body: JSON.stringify({ content })
+      body: JSON.stringify({ content: contentToSave })
     });
     const payload = await response.json().catch(() => ({ message: "Save failed." }));
 

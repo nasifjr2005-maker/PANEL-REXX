@@ -137,7 +137,16 @@ function getStorageDetails(): ContentStorageDetails {
 async function readStoredContent(storage: ContentStorageDetails) {
   if (storage.provider === "netlify-blobs") {
     const store = getNetlifyStore();
-    return (await store.get(CONTENT_KEY, { type: "json" })) as Partial<SiteContent> | null;
+
+    try {
+      return (await store.get(CONTENT_KEY, { type: "json", consistency: "strong" })) as Partial<SiteContent> | null;
+    } catch (error) {
+      if (error instanceof Error && error.name === "BlobsConsistencyError") {
+        return (await store.get(CONTENT_KEY, { type: "json" })) as Partial<SiteContent> | null;
+      }
+
+      throw error;
+    }
   }
 
   if (!existsSync(LOCAL_DATA_PATH)) {
