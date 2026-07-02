@@ -51,10 +51,11 @@ export default function AdminPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ username, password })
     });
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({ message: "Login failed." }));
 
     if (!response.ok || !payload.token) {
-      setMessage(payload.message ?? "Login failed.");
+      const missing = Array.isArray(payload.missing) && payload.missing.length ? ` Missing: ${payload.missing.join(", ")}.` : "";
+      setMessage(`${payload.message ?? "Login failed."}${missing}`);
       return;
     }
 

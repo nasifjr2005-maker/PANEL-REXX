@@ -1,6 +1,19 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 const KEYAUTH_API_URL = "https://keyauth.win/api/1.3/";
+const REQUIRED_SERVER_ENV = ["KEYAUTH_NAME", "KEYAUTH_OWNER_ID", "ADMIN_SESSION_SECRET"] as const;
+
+type RequiredServerEnv = (typeof REQUIRED_SERVER_ENV)[number];
+
+export class MissingServerEnvError extends Error {
+  missing: RequiredServerEnv[];
+
+  constructor(missing: RequiredServerEnv[]) {
+    super(`Missing server environment variables: ${missing.join(", ")}`);
+    this.name = "MissingServerEnvError";
+    this.missing = missing;
+  }
+}
 
 type KeyAuthInitResponse = {
   success: boolean;
@@ -13,12 +26,62 @@ type KeyAuthLoginResponse = {
   message?: string;
 };
 
-function requiredEnv(name: string) {
-  const value = process.env[name];
+function cleanEnvValue(name: string, value: string | undefined) {
   if (!value) {
-    throw new Error(`${name} is not configured`);
+    return "";
+  }
+
+  let cleaned = value.trim();
+
+  if ((cleaned.startsWith("\"") && cleaned.endsWith("\"")) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+
+  const copiedLinePrefix = new RegExp(`^${name}\\s*=`, "i");
+  if (copiedLinePrefix.test(cleaned)) {
+    cleaned = cleaned.replace(copiedLinePrefix, "").trim();
+  }
+
+  if ((cleaned.startsWith("\"") && cleaned.endsWith("\"")) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+
+  return cleaned;
+}
+
+function envValue(name: string) {
+  return cleanEnvValue(name, process.env[name]);
+}
+
+function requiredEnv(name: RequiredServerEnv) {
+  const value = envValue(name);
+  if (!value) {
+    throw new MissingServerEnvError([name]);
   }
   return value;
+}
+
+export function getServerEnvDiagnostics() {
+  const missing = REQUIRED_SERVER_ENV.filter((name) => !envValue(name));
+  const warnings: string[] = [];
+
+  if (!envValue("KEYAUTH_SECRET")) {
+    warnings.push("KEYAUTH_SECRET is blank. Add it to Netlify with the rest of the KeyAuth variables.");
+  }
+
+  if (envValue("ADMIN_SESSION_SECRET") === "your-long-random-secret") {
+    warnings.push("ADMIN_SESSION_SECRET is still using the placeholder value.");
+  }
+
+  return {
+    ready: missing.length === 0,
+    missing,
+    warnings
+  };
+}
+
+export function isMissingServerEnvError(error: unknown): error is MissingServerEnvError {
+  return error instanceof MissingServerEnvError;
 }
 
 async function callKeyAuth(params: Record<string, string>) {
@@ -38,14 +101,14 @@ async function callKeyAuth(params: Record<string, string>) {
 }
 
 function getKeyAuthHwid(name: string, ownerid: string) {
-  const explicitHwid = process.env.KEYAUTH_HWID?.trim();
+  const explicitHwid = envValue("KEYAUTH_HWID");
 
   if (explicitHwid) {
     return explicitHwid;
   }
 
   const seed = [
-    process.env.ADMIN_SESSION_SECRET,
+    envValue("ADMIN_SESSION_SECRET"),
     ownerid,
     name,
     "panel-rexx-admin"
@@ -60,7 +123,7 @@ function getKeyAuthHwid(name: string, ownerid: string) {
 export async function verifyKeyAuthUser(username: string, password: string) {
   const name = requiredEnv("KEYAUTH_NAME");
   const ownerid = requiredEnv("KEYAUTH_OWNER_ID");
-  const version = process.env.KEYAUTH_VERSION ?? "1.0";
+  const version = envValue("KEYAUTH_VERSION") || "1.0";
   const hwid = getKeyAuthHwid(name, ownerid);
 
   const init = (await callKeyAuth({
@@ -103,7 +166,7 @@ export function createAdminToken() {
 }
 
 export function isAdminTokenValid(token: string | undefined) {
-  const secret = process.env.ADMIN_SESSION_SECRET;
+  const secret = envValue("ADMIN_SESSION_SECRET");
   if (!secret || !token) {
     return false;
   }

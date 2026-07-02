@@ -1,10 +1,30 @@
 import { NextResponse } from "next/server";
-import { createAdminToken, verifyKeyAuthUser } from "@/lib/keyauth";
+import { createAdminToken, getServerEnvDiagnostics, isMissingServerEnvError, verifyKeyAuthUser } from "@/lib/keyauth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function environmentErrorResponse(missing: readonly string[], warnings: readonly string[] = []) {
+  const location = process.env.NETLIFY ? "Netlify Functions runtime" : "server runtime";
+  const variableList = missing.join(", ");
+  const warningText = warnings.length ? ` ${warnings.join(" ")}` : "";
+
+  return NextResponse.json(
+    {
+      message: `${location} is missing required environment variables: ${variableList}. Add them in Netlify Site configuration > Environment variables, include the Functions scope, then redeploy.${warningText}`,
+      missing,
+      warnings
+    },
+    { status: 500 }
+  );
+}
+
 export async function POST(request: Request) {
+  const diagnostics = getServerEnvDiagnostics();
+  if (!diagnostics.ready) {
+    return environmentErrorResponse(diagnostics.missing, diagnostics.warnings);
+  }
+
   const body = (await request.json()) as { username?: string; password?: string };
   const username = body.username?.trim();
   const password = body.password ?? "";
@@ -22,12 +42,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ token: createAdminToken(), message: "Authenticated." });
   } catch (error) {
+    if (isMissingServerEnvError(error)) {
+      return environmentErrorResponse(error.missing);
+    }
+
     return NextResponse.json(
       {
-        message:
-          error instanceof Error && error.message.includes("KEYAUTH")
-            ? "KeyAuth environment variables are not configured."
-            : "KeyAuth authentication failed."
+        message: "KeyAuth authentication failed."
       },
       { status: 500 }
     );
