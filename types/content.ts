@@ -41,6 +41,8 @@ export type Project = {
   status: string;
   description: string;
   stack: string[];
+  previewVideoUrl?: string;
+  previewPosterUrl?: string;
   featured?: boolean;
 };
 

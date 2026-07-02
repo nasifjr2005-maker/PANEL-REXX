@@ -679,10 +679,34 @@ function Projects({ content }: { content: SiteContent }) {
     >
       <div className="project-grid">
         {featured ? <TiltCard className="project-card glass-panel animated-border magnetic">
-          <div className="project-media">
-            <div className="project-media-label">
-              <span>Project Image Placeholder</span>
-            </div>
+          <div className={`project-media ${featured.previewVideoUrl ? "has-video" : ""}`}>
+            {featured.previewVideoUrl ? (
+              <>
+                <video
+                  className="project-preview-video"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  poster={featured.previewPosterUrl}
+                  aria-label={`${featured.title} video preview`}
+                  onCanPlay={(event) => void event.currentTarget.play().catch(() => undefined)}
+                  onPause={(event) => {
+                    if (!event.currentTarget.ended) {
+                      void event.currentTarget.play().catch(() => undefined);
+                    }
+                  }}
+                >
+                  <source src={featured.previewVideoUrl} type="video/mp4" />
+                </video>
+                <span className="project-video-badge">Video Preview</span>
+              </>
+            ) : (
+              <div className="project-media-label">
+                <span>Project Image Placeholder</span>
+              </div>
+            )}
           </div>
           <h3>{featured.title}</h3>
           <p>{featured.description}</p>

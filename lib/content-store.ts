@@ -3,11 +3,23 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getStore } from "@netlify/blobs";
 import { defaultContent } from "@/lib/default-content";
-import type { SiteContent } from "@/types/content";
+import type { Project, SiteContent } from "@/types/content";
 
 const STORE_NAME = "portfolio-admin";
 const CONTENT_KEY = "site-content";
 const LOCAL_DATA_PATH = path.join(process.cwd(), ".data", "site-content.json");
+
+function mergeProjects(projects: Project[] | undefined): Project[] {
+  if (!projects) {
+    return defaultContent.projects;
+  }
+
+  return projects.map((project, index) => ({
+    ...(defaultContent.projects[index] ?? {}),
+    ...project,
+    stack: project.stack ?? defaultContent.projects[index]?.stack ?? []
+  }));
+}
 
 function mergeContent(content: Partial<SiteContent> | null | undefined): SiteContent {
   return {
@@ -24,7 +36,7 @@ function mergeContent(content: Partial<SiteContent> | null | undefined): SiteCon
     founderStats: content?.founderStats ?? defaultContent.founderStats,
     founderHighlights: content?.founderHighlights ?? defaultContent.founderHighlights,
     interests: content?.interests ?? defaultContent.interests,
-    projects: content?.projects ?? defaultContent.projects,
+    projects: mergeProjects(content?.projects),
     timeline: content?.timeline ?? defaultContent.timeline,
     socials: content?.socials ?? defaultContent.socials
   };

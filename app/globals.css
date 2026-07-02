@@ -1249,6 +1249,49 @@ button {
   letter-spacing: 0.12em;
 }
 
+.project-media.has-video::before,
+.project-media.has-video::after {
+  display: none;
+}
+
+.project-preview-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.86;
+  filter: saturate(1.08) contrast(1.05);
+}
+
+.project-media.has-video::before {
+  display: block;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  background:
+    linear-gradient(180deg, rgba(2, 3, 10, 0.08), rgba(2, 3, 10, 0.34)),
+    radial-gradient(circle at 76% 76%, rgba(139, 92, 255, 0.28), transparent 34%),
+    linear-gradient(90deg, rgba(34, 246, 255, 0.14), transparent 38%);
+}
+
+.project-video-badge {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 2;
+  border: 1px solid rgba(34, 246, 255, 0.42);
+  border-radius: 8px;
+  background: rgba(3, 8, 22, 0.72);
+  padding: 0.5rem 0.68rem;
+  color: var(--cyan);
+  font-family: var(--font-display);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 0 24px rgba(34, 246, 255, 0.2);
+}
+
 .project-media-label {
   position: absolute;
   inset: 0;

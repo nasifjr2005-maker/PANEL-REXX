@@ -105,6 +105,8 @@ export const defaultContent: SiteContent = {
       description:
         "A premium digital storefront concept for the PANEL 50 identity, designed around gaming energy, sharp presentation, and a scalable future commerce experience.",
       stack: ["Next.js", "TypeScript", "Tailwind", "Framer Motion", "Three.js"],
+      previewVideoUrl: "/assets/panel50-store-preview.mp4",
+      previewPosterUrl: "/assets/panel50-store-preview-poster.jpg",
       featured: true
     },
     {
